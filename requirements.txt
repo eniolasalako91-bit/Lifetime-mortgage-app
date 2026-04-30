@@ -2,3 +2,477 @@ requirements.txt
 streamlit
 pandas
 matplotlib
+def gbp(value):
+    return f"£{value:,.0f}"
+
+def calculate_model(
+    original_mortgage,
+    mortgage_paid_percent,
+    current_property_value,
+    equity_release_percent,
+    annual_interest_rate,
+    property_growth_rate,
+    years,
+    interest_mode,
+    release_basis
+):
+    remaining_mortgage = original_mortgage * ((100 - mortgage_paid_percent) / 100)
+    client_ownership_value_now = current_property_value * (mortgage_paid_percent / 100)
+
+    if release_basis == "Full property value":
+        release_base = current_property_value
+    else:
+        release_base = client_ownership_value_now
+
+    equity_released = release_base * (equity_release_percent / 100)
+    net_cash_now = equity_released - remaining_mortgage
+
+    future_property_value = current_property_value * ((1 + property_growth_rate / 100) ** years)
+
+    if interest_mode == "Rolled-up / compounded":
+        debt_at_sale = equity_released * ((1 + annual_interest_rate / 100) ** years)
+        monthly_interest_payment = 0
+        total_interest_paid = 0
+        interest_cost = debt_at_sale - equity_released
+    else:
+        debt_at_sale = equity_released
+        monthly_interest_payment = (equity_released * (annual_interest_rate / 100)) / 12
+        total_interest_paid = monthly_interest_payment * 12 * years
+        interest_cost = total_interest_paid
+
+    debt_after_cap = min(debt_at_sale, future_property_value)
+    remaining_equity_at_sale = max(0, future_property_value - debt_after_cap)
+
+    total_client_position = remaining_equity_at_sale + net_cash_now - total_interest_paid
+    no_release_position = future_property_value - remaining_mortgage
+    difference_vs_no_release = total_client_position - no_release_position
+
+    return {
+        "remaining_mortgage": remaining_mortgage,
+        "client_ownership_value_now": client_ownership_value_now,
+        "release_base": release_base,
+        "equity_released": equity_released,
+        "net_cash_now": net_cash_now,
+        "future_property_value": future_property_value,
+        "debt_at_sale": debt_at_sale,
+        "debt_after_cap": debt_after_cap,
+        "monthly_interest_payment": monthly_interest_payment,
+        "total_interest_paid": total_interest_paid,
+        "interest_cost": interest_cost,
+        "remaining_equity_at_sale": remaining_equity_at_sale,
+        "total_client_position": total_client_position,
+        "no_release_position": no_release_position,
+        "difference_vs_no_release": difference_vs_no_release
+    }
+
+def insight_message(result, years, property_growth_rate, interest_mode):
+    net_cash = result["net_cash_now"]
+    debt = result["debt_at_sale"]
+    future_value = result["future_property_value"]
+    equity = result["remaining_equity_at_sale"]
+    diff = result["difference_vs_no_release"]
+
+    if diff < 0:
+        decision_text = (
+            f"This scenario gives {gbp(net_cash)} usable cash now, but the projected total position is "
+            f"{gbp(abs(diff))} lower than the no-release option."
+        )
+    else:
+        decision_text = (
+            f"This scenario gives {gbp(net_cash)} usable cash now and the projected total position is "
+            f"{gbp(diff)} higher than the no-release option."
+        )
+
+    if interest_mode == "Rolled-up / compounded":
+        interest_text = (
+            "Interest is rolled up, so the debt grows over time and is repaid when the property is sold."
+        )
+    else:
+        interest_text = (
+            "Interest is paid monthly, so the debt remains closer to the original release amount, "
+            "but the client must afford regular monthly payments."
+        )
+
+    return (
+        f"After {years} years, assuming property growth of {property_growth_rate}% per year, "
+        f"the property may be worth {gbp(future_value)}. The projected debt is {gbp(debt)}, "
+        f"leaving estimated remaining equity of {gbp(equity)}. {interest_text} {decision_text}"
+    )
+
+st.set_page_config(
+    page_title="Lifetime Mortgage Decision Model",
+    layout="wide"
+)
+
+st.title("Lifetime Mortgage Financial Decision Model")
+
+st.write(
+    "This tool compares lifetime mortgage outcomes by modelling property growth, "
+    "interest treatment, time, and equity release percentage."
+)
+
+st.warning(
+    "This is a decision-support tool only. It is not financial advice. "
+    "Users should seek independent regulated financial advice before making decisions."
+)
+
+st.sidebar.header("Preset")
+
+preset = st.sidebar.selectbox(
+    "Choose starting example",
+    [
+        "Custom",
+        "Case Study 1 - 50% Release",
+        "Case Study 2 - 20% Release"
+    ]
+)
+
+if preset == "Case Study 1 - 50% Release":
+    default_original_mortgage = 100000
+    default_paid_percent = 70.0
+    default_current_value = 200000
+    default_release_percent = 50.0
+elif preset == "Case Study 2 - 20% Release":
+    default_original_mortgage = 100000
+    default_paid_percent = 70.0
+    default_current_value = 200000
+    default_release_percent = 20.0
+else:
+    default_original_mortgage = 100000
+    default_paid_percent = 70.0
+    default_current_value = 200000
+    default_release_percent = 30.0
+
+st.sidebar.header("Client Inputs")
+
+original_mortgage = st.sidebar.number_input(
+    "Original mortgage / acquisition price (£)",
+    min_value=0,
+    value=default_original_mortgage,
+    step=5000
+)
+mortgage_paid_percent = st.sidebar.number_input(
+    "Mortgage already paid (%)",
+    min_value=0.0,
+    max_value=100.0,
+    value=default_paid_percent,
+    step=1.0
+)
+current_property_value = st.sidebar.number_input(
+    "Current property value (£)",
+    min_value=1,
+    value=default_current_value,
+    step=5000
+)
+equity_release_percent = st.sidebar.number_input(
+    "Equity release percentage (%)",
+    min_value=0.0,
+    max_value=100.0,
+    value=default_release_percent,
+    step=1.0
+)
+annual_interest_rate = st.sidebar.number_input(
+    "Annual interest rate (%)",
+    min_value=0.0,
+    max_value=25.0,
+    value=5.0,
+    step=0.1
+)
+years = st.sidebar.number_input(
+    "Years until sale / care / death",
+    min_value=1,
+    max_value=50,
+    value=15,
+    step=1
+)
+property_growth_rate = st.sidebar.number_input(
+    "Main property growth assumption (%)",
+    min_value=-10.0,
+    max_value=20.0,
+    value=2.0,
+    step=0.1
+)
+interest_mode = st.sidebar.selectbox(
+    "Interest treatment",
+    [
+        "Rolled-up / compounded",
+        "Interest paid monthly"
+    ]
+)
+release_basis = st.sidebar.selectbox(
+    "Release calculation basis",
+    [
+        "Full property value",
+        "Client ownership value only"
+    ]
+)
+
+
+result = calculate_model(
+    original_mortgage,
+    mortgage_paid_percent,
+    current_property_value,
+    equity_release_percent,
+    annual_interest_rate,
+    property_growth_rate,
+    years,
+    interest_mode,
+    release_basis
+)
+
+st.subheader("Key Outputs")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Net cash now", gbp(result["net_cash_now"]))
+col2.metric("Debt at sale", gbp(result["debt_at_sale"]))
+col3.metric("Remaining equity", gbp(result["remaining_equity_at_sale"]))
+col4.metric("Difference vs no release", gbp(result["difference_vs_no_release"]))
+
+st.subheader("Decision Insight")
+st.info(insight_message(result, years, property_growth_rate, interest_mode))
+
+st.subheader("Detailed Breakdown")
+
+breakdown = pd.DataFrame({
+    "Item": [
+        "Original mortgage",
+        "Remaining mortgage",
+        "Client ownership value now",
+        "Release base",
+        "Equity released",
+        "Net cash now",
+        "Future property value",
+        "Debt at sale",
+        "Debt after no-negative-equity cap",
+        "Monthly interest payment",
+        "Total interest paid",
+        "Remaining equity at sale",
+        "Total client position",
+        "No-release position",
+        "Difference vs no release"
+    ],
+    "Value": [
+        original_mortgage,
+        result["remaining_mortgage"],
+        result["client_ownership_value_now"],
+        result["release_base"],
+        result["equity_released"],
+        result["net_cash_now"],
+        result["future_property_value"],
+        result["debt_at_sale"],
+        result["debt_after_cap"],
+        result["monthly_interest_payment"],
+        result["total_interest_paid"],
+        result["remaining_equity_at_sale"],
+        result["total_client_position"],
+        result["no_release_position"],
+        result["difference_vs_no_release"]
+    ]
+})
+st.dataframe(
+    breakdown.style.format({"Value": "£{:,.0f}"}),
+    use_container_width=True
+)
+
+st.subheader("Multiple Possible Futures")
+
+growth_rates = sorted(set([
+    -1.0,
+    0.0,
+    2.0,
+    3.0,
+    5.0,
+    property_growth_rate
+]))
+
+scenario_rows = []
+
+for growth in growth_rates:
+    for mode in ["Rolled-up / compounded", "Interest paid monthly"]:
+        scenario = calculate_model(
+            original_mortgage,
+            mortgage_paid_percent,
+            current_property_value,
+            equity_release_percent,
+            annual_interest_rate,
+            growth,
+            years,
+            mode,
+            release_basis
+        )
+        scenario_rows.append({
+            "Property growth": f"{growth:.1f}%",
+            "Interest treatment": mode,
+            "Future property value": scenario["future_property_value"],
+            "Debt at sale": scenario["debt_at_sale"],
+            "Monthly payment": scenario["monthly_interest_payment"],
+            "Total interest paid": scenario["total_interest_paid"],
+            "Remaining equity": scenario["remaining_equity_at_sale"],
+            "Difference vs no release": scenario["difference_vs_no_release"]
+        })
+
+scenario_df = pd.DataFrame(scenario_rows)
+
+st.dataframe(
+    scenario_df.style.format({
+        "Future property value": "£{:,.0f}",
+        "Debt at sale": "£{:,.0f}",
+        "Monthly payment": "£{:,.0f}",
+        "Total interest paid": "£{:,.0f}",
+        "Remaining equity": "£{:,.0f}",
+        "Difference vs no release": "£{:,.0f}"
+    }),
+    use_container_width=True
+)
+
+st.subheader("Rolled-up Interest vs Monthly Interest-Paid")
+
+rolled = calculate_model(
+    original_mortgage,
+    mortgage_paid_percent,
+    current_property_value,
+    equity_release_percent,
+    annual_interest_rate,
+    property_growth_rate,
+    years,
+    "Rolled-up / compounded",
+    release_basis
+)
+
+monthly = calculate_model(
+    original_mortgage,
+    mortgage_paid_percent,
+    current_property_value,
+    equity_release_percent,
+    annual_interest_rate,
+    property_growth_rate,
+    years,
+    "Interest paid monthly",
+    release_basis
+)
+
+comparison = pd.DataFrame({
+    "Option": ["Rolled-up / compounded", "Interest paid monthly"],
+    "Debt at sale": [rolled["debt_at_sale"], monthly["debt_at_sale"]],
+    "Remaining equity": [rolled["remaining_equity_at_sale"], monthly["remaining_equity_at_sale"]],
+    "Total interest paid": [rolled["total_interest_paid"], monthly["total_interest_paid"]],
+    "Total client position": [rolled["total_client_position"], monthly["total_client_position"]]
+})
+
+st.dataframe(
+    comparison.style.format({
+        "Debt at sale": "£{:,.0f}",
+        "Remaining equity": "£{:,.0f}",
+        "Total interest paid": "£{:,.0f}",
+        "Total client position": "£{:,.0f}"
+    }),
+    use_container_width=True
+)
+
+fig1, ax1 = plt.subplots()
+ax1.bar(comparison["Option"], comparison["Debt at sale"])
+ax1.set_title("Debt at Sale")
+ax1.set_ylabel("Amount (£)")
+st.pyplot(fig1)
+
+fig2, ax2 = plt.subplots()
+ax2.bar(comparison["Option"], comparison["Remaining equity"])
+ax2.set_title("Remaining Equity at Sale")
+ax2.set_ylabel("Amount (£)")
+st.pyplot(fig2)
+
+st.subheader("Time Impact View")
+
+time_rows = []
+
+for year in range(1, years + 1):
+    rolled_year = calculate_model(
+        original_mortgage,
+        mortgage_paid_percent,
+        current_property_value,
+        equity_release_percent,
+        annual_interest_rate,
+        property_growth_rate,
+        year,
+        "Rolled-up / compounded",
+        release_basis
+    )
+
+    monthly_year = calculate_model(
+        original_mortgage,
+        mortgage_paid_percent,
+        current_property_value,
+        equity_release_percent,
+        annual_interest_rate,
+        property_growth_rate,
+        year,
+        "Interest paid monthly",
+        release_basis
+    )
+
+    time_rows.append({
+        "Year": year,
+        "Property value": rolled_year["future_property_value"],
+        "Rolled-up debt": rolled_year["debt_at_sale"],
+        "Rolled-up equity": rolled_year["remaining_equity_at_sale"],
+        "Monthly-interest debt": monthly_year["debt_at_sale"],
+        "Monthly-interest equity": monthly_year["remaining_equity_at_sale"]
+    })
+
+time_df = pd.DataFrame(time_rows)
+
+fig3, ax3 = plt.subplots()
+ax3.plot(time_df["Year"], time_df["Property value"], label="Property value")
+ax3.plot(time_df["Year"], time_df["Rolled-up debt"], label="Rolled-up debt")
+ax3.plot(time_df["Year"], time_df["Monthly-interest debt"], label="Monthly-interest debt")
+ax3.set_title("Property Value vs Debt Over Time")
+ax3.set_xlabel("Years")
+ax3.set_ylabel("Amount (£)")
+ax3.legend()
+st.pyplot(fig3)
+
+fig4, ax4 = plt.subplots()
+ax4.plot(time_df["Year"], time_df["Rolled-up equity"], label="Rolled-up equity")
+ax4.plot(time_df["Year"], time_df["Monthly-interest equity"], label="Monthly-interest equity")
+ax4.set_title("Remaining Equity Over Time")
+ax4.set_xlabel("Years")
+ax4.set_ylabel("Remaining equity (£)")
+ax4.legend()
+st.pyplot(fig4)
+
+st.dataframe(
+    time_df.style.format({
+        "Property value": "£{:,.0f}",
+        "Rolled-up debt": "£{:,.0f}",
+        "Rolled-up equity": "£{:,.0f}",
+        "Monthly-interest debt": "£{:,.0f}",
+        "Monthly-interest equity": "£{:,.0f}"
+    }),
+    use_container_width=True
+)
+
+st.subheader("Plain-English Summary")
+
+st.write(
+    """
+    This model shows the trade-off between immediate cash and future equity.
+
+    The key issue is that two things happen over time:
+
+    1. The lifetime mortgage debt may grow, especially if interest is rolled up.
+    2. The property value may also grow, depending on the housing market.
+
+    If property growth is stronger than loan growth, the client may preserve more equity.
+    If loan growth is stronger than property growth, more of the property value may be used to repay the loan.
+
+    Paying interest monthly can help preserve future equity, but it requires regular affordability.
+    Rolling up interest protects monthly cash flow, but usually increases the final debt.
+    """
+)
+'''
+
+with open('app.py', 'w') as f:
+    f.write(app_content)
+
+!streamlit run app.py
