@@ -832,13 +832,7 @@ st.download_button(
 # FOOTER
 # ==========================================================
 
-st.markdown("---")
-st.caption(
-    "Financial model concept and implementation. Built with AI assistance. "
-    "This tool is proprietary. Unauthorized use, reproduction, or distribution is prohibited."
-)
-
-st.subheader("Plain-English Summary")
+st.subheader("Summary")
 
 st.write(
     """
@@ -863,4 +857,10 @@ st.write(
     investment of released cash, investment of avoided mortgage payments, no negative equity protection,
     and the opportunity benefit of not having to continue paying the existing mortgage.
     """
+)
+
+st.markdown("---")
+st.caption(
+    "Financial model concept and implementation. Built with AI assistance. "
+    "This tool is proprietary. Unauthorized reproduction is prohibited."
 )
