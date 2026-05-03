@@ -143,11 +143,7 @@ def calculate_model(
     mortgage_interest_paid_until_sale = mortgage_savings["mortgage_interest_paid_until_sale"]
 
     if invest_cash_balance == "Yes":
-        future_value_of_cash_balance = future_value_lump_sum(
-            max(0, net_cash_now),
-            investment_return_rate,
-            years
-        )
+        future_value_of_cash_balance = future_value_lump_sum(max(0, net_cash_now), investment_return_rate, years)
     else:
         future_value_of_cash_balance = max(0, net_cash_now)
 
@@ -171,11 +167,7 @@ def calculate_model(
     sell_now_cash = current_property_value - remaining_mortgage
 
     if invest_sell_now_cash == "Yes":
-        future_value_sell_now_cash = future_value_lump_sum(
-            sell_now_cash,
-            investment_return_rate,
-            years
-        )
+        future_value_sell_now_cash = future_value_lump_sum(sell_now_cash, investment_return_rate, years)
     else:
         future_value_sell_now_cash = sell_now_cash
 
@@ -335,26 +327,49 @@ st.write(
     "time to disposal, interest treatment, mortgage-payment savings, investment assumptions, and the option to sell now."
 )
 
-st.info(
-    "This tool provides scenario-based comparisons using user-defined assumptions. "
-    "Actual outcomes may differ due to market conditions, interest rate changes, property performance, "
-    "and individual financial circumstances."
+# ==========================================================
+# INFORMATION REEL / SLICER
+# ==========================================================
+
+st.subheader("Information Reel")
+
+info_options = [
+    "Scenario-based tool",
+    "Not financial advice",
+    "No negative equity protection",
+    "Tax-free cash note"
+]
+
+selected_info = st.select_slider(
+    "Move the slicer to read key information",
+    options=info_options,
+    value="Scenario-based tool"
 )
 
-st.warning(
-    "This is a decision-support tool only. It is not financial advice. "
-    "Users should seek independent regulated financial advice before making decisions."
-)
+if selected_info == "Scenario-based tool":
+    st.info(
+        "This tool provides scenario-based comparisons using user-defined assumptions. "
+        "Actual outcomes may differ due to market conditions, interest rate changes, property performance, "
+        "and individual financial circumstances."
+    )
 
-st.info(
-    "No negative equity protection: if the property value falls and the amount due becomes greater than the property value, "
-    "the homeowner or estate will not owe more than the property is worth. This model caps repayment at the property value."
-)
+elif selected_info == "Not financial advice":
+    st.warning(
+        "This is a decision-support tool only. It is not financial advice. "
+        "Users should seek independent regulated financial advice before making decisions."
+    )
 
-st.info(
-    "Equity release cash is generally tax-free because it is treated as borrowing against the home, not income. "
-    "However, tax may apply depending on how the money is later used or invested."
-)
+elif selected_info == "No negative equity protection":
+    st.info(
+        "No negative equity protection: if the property value falls and the amount due becomes greater than the property value, "
+        "the homeowner or estate will not owe more than the property is worth. This model caps repayment at the property value."
+    )
+
+elif selected_info == "Tax-free cash note":
+    st.info(
+        "Equity release cash is generally tax-free because it is treated as borrowing against the home, not income. "
+        "However, tax may apply depending on how the money is later used or invested."
+    )
 
 # ==========================================================
 # SIDEBAR INPUTS
@@ -861,6 +876,6 @@ st.write(
 
 st.markdown("---")
 st.caption(
-    "Financial model concept and implementation. Built with AI assistance. "
+    "© 2026 ESalako. Financial model concept and implementation. Built with AI assistance. "
     "This tool is proprietary. Unauthorized reproduction is prohibited."
 )
