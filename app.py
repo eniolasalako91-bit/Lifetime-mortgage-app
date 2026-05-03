@@ -5,10 +5,7 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-st.set_page_config(
-    page_title="Lifetime Mortgage Decision Model",
-    layout="wide"
-)
+st.set_page_config(page_title="Lifetime Mortgage Decision Model", layout="wide")
 
 # ==========================================================
 # HELPERS
@@ -27,6 +24,19 @@ def future_value_lump_sum(amount, annual_rate, years):
     return amount * ((1 + annual_rate / 100) ** years)
 
 
+def present_value(future_value, discount_rate, years):
+    return future_value / ((1 + discount_rate / 100) ** years)
+
+
+def display_value(value, years, discount_rate, valuation_view):
+    if valuation_view == "Nominal future value":
+        return gbp(value)
+    elif valuation_view == "Present value discounted to today":
+        return gbp(present_value(value, discount_rate, years))
+    else:
+        return f"{gbp(value)} future / {gbp(present_value(value, discount_rate, years))} today"
+
+
 def future_value_annual_savings(annual_savings_list, annual_rate):
     total = 0
     total_years = len(annual_savings_list)
@@ -38,11 +48,7 @@ def future_value_annual_savings(annual_savings_list, annual_rate):
     return total
 
 
-def calculate_mortgage_savings(
-    remaining_mortgage,
-    mortgage_interest_rate,
-    years_until_sale
-):
+def calculate_mortgage_savings(remaining_mortgage, mortgage_interest_rate, years_until_sale):
     if years_until_sale <= 0 or remaining_mortgage <= 0:
         return {
             "mortgage_principal_paid_until_sale": 0,
@@ -160,10 +166,7 @@ def calculate_model(
         - total_interest_paid
     )
 
-    no_equity_release_position = (
-        future_property_value
-        - mortgage_interest_paid_until_sale
-    )
+    no_equity_release_position = future_property_value - mortgage_interest_paid_until_sale
 
     sell_now_cash = current_property_value - remaining_mortgage
 
@@ -222,13 +225,9 @@ def insight_message(result, years, property_growth_rate, interest_mode):
     diff = result["difference_vs_no_equity_release"]
 
     if diff < 0:
-        comparison_text = (
-            f"The projected client position is {gbp(abs(diff))} lower than the no-equity-release option."
-        )
+        comparison_text = f"The projected client position is {gbp(abs(diff))} lower than the no-equity-release option."
     else:
-        comparison_text = (
-            f"The projected client position is {gbp(diff)} higher than the no-equity-release option."
-        )
+        comparison_text = f"The projected client position is {gbp(diff)} higher than the no-equity-release option."
 
     return (
         f"After {years} years, assuming property growth of {property_growth_rate}% per year, "
@@ -243,7 +242,7 @@ def insight_message(result, years, property_growth_rate, interest_mode):
 # PDF REPORT
 # ==========================================================
 
-def create_pdf_report(result, inputs):
+def create_pdf_report(result, inputs, valuation_view, discount_rate, years):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -263,6 +262,10 @@ def create_pdf_report(result, inputs):
     pdf.setFont("Helvetica", 9)
     for key, value in inputs.items():
         y -= 16
+        if y < 80:
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica", 9)
         pdf.drawString(50, y, f"{key}: {value}")
 
     y -= 30
@@ -270,18 +273,18 @@ def create_pdf_report(result, inputs):
     pdf.drawString(50, y, "Key Results")
 
     report_items = {
-        "Cash received now": gbp(result["net_cash_now"]),
-        "Future property value": gbp(result["future_property_value"]),
-        "Equity Lender share at disposal": gbp(result["equity_lender_share_at_disposal"]),
-        "Rolled-up interest": gbp(result["rolled_up_interest"]),
-        "Amount due to Equity Lender": gbp(result["amount_due_to_equity_lender"]),
-        "Remaining equity at sale": gbp(result["remaining_equity_at_sale"]),
-        "Future value of cash balance": gbp(result["future_value_of_cash_balance"]),
-        "Future value of mortgage savings": gbp(result["future_value_of_mortgage_savings"]),
-        "Total client position": gbp(result["total_client_position"]),
-        "No-equity-release position": gbp(result["no_equity_release_position"]),
-        "Sell-now position": gbp(result["future_value_sell_now_cash"]),
-        "Difference vs no equity release": gbp(result["difference_vs_no_equity_release"]),
+        "Cash received now": display_value(result["net_cash_now"], years, discount_rate, valuation_view),
+        "Future property value": display_value(result["future_property_value"], years, discount_rate, valuation_view),
+        "Equity Lender share at disposal": display_value(result["equity_lender_share_at_disposal"], years, discount_rate, valuation_view),
+        "Rolled-up interest": display_value(result["rolled_up_interest"], years, discount_rate, valuation_view),
+        "Amount due to Equity Lender": display_value(result["amount_due_to_equity_lender"], years, discount_rate, valuation_view),
+        "Remaining equity at sale": display_value(result["remaining_equity_at_sale"], years, discount_rate, valuation_view),
+        "Future value of cash balance": display_value(result["future_value_of_cash_balance"], years, discount_rate, valuation_view),
+        "Future value of mortgage savings": display_value(result["future_value_of_mortgage_savings"], years, discount_rate, valuation_view),
+        "Total client position": display_value(result["total_client_position"], years, discount_rate, valuation_view),
+        "No-equity-release position": display_value(result["no_equity_release_position"], years, discount_rate, valuation_view),
+        "Sell-now position": display_value(result["future_value_sell_now_cash"], years, discount_rate, valuation_view),
+        "Difference vs no equity release": display_value(result["difference_vs_no_equity_release"], years, discount_rate, valuation_view),
     }
 
     pdf.setFont("Helvetica", 9)
@@ -300,6 +303,7 @@ def create_pdf_report(result, inputs):
     notes = [
         "This tool provides scenario-based comparisons using user-defined assumptions.",
         "Actual outcomes may differ due to market conditions, interest rate changes, property performance, and individual circumstances.",
+        "Nominal future value shows projected future amounts. Present value discounts future amounts back to today's value.",
         "Equity release cash is generally tax-free because it is treated as borrowing against the home, not income.",
         "No negative equity protection: repayment is capped at the property value in this model.",
         "The sell-now comparison excludes capital gains tax, estate agency fees, legal fees, moving costs, and other sale-related costs.",
@@ -314,6 +318,7 @@ def create_pdf_report(result, inputs):
             pdf.setFont("Helvetica", 8)
         pdf.drawString(50, y, f"- {note}")
 
+    pdf.drawString(50, 40, "Financial model concept and implementation. Built with AI assistance.")
     pdf.save()
     buffer.seek(0)
     return buffer
@@ -440,6 +445,25 @@ invest_cash_balance = st.sidebar.selectbox("Invest remaining cash balance?", ["N
 invest_mortgage_savings = st.sidebar.selectbox("Invest mortgage payment savings?", ["No", "Yes"])
 invest_sell_now_cash = st.sidebar.selectbox("Invest cash from selling property now?", ["No", "Yes"])
 
+st.sidebar.header("Valuation View")
+
+valuation_view = st.sidebar.selectbox(
+    "How should results be shown?",
+    [
+        "Nominal future value",
+        "Present value discounted to today",
+        "Show both"
+    ]
+)
+
+discount_rate = st.sidebar.number_input(
+    "Discount rate for present value (%)",
+    min_value=0.0,
+    max_value=25.0,
+    value=3.0,
+    step=0.1
+)
+
 # ==========================================================
 # MAIN CALCULATION
 # ==========================================================
@@ -469,15 +493,16 @@ st.subheader("Key Outputs")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Cash received now", gbp(result["net_cash_now"]))
-col2.metric("Amount due to Equity Lender", gbp(result["amount_due_to_equity_lender"]))
-col3.metric("Remaining equity at sale", gbp(result["remaining_equity_at_sale"]))
-col4.metric("Total client position", gbp(result["total_client_position"]))
+col1.metric("Cash received now", display_value(result["net_cash_now"], years, discount_rate, valuation_view))
+col2.metric("Amount due to Equity Lender", display_value(result["amount_due_to_equity_lender"], years, discount_rate, valuation_view))
+col3.metric("Remaining equity at sale", display_value(result["remaining_equity_at_sale"], years, discount_rate, valuation_view))
+col4.metric("Total client position", display_value(result["total_client_position"], years, discount_rate, valuation_view))
 
 explain("Cash received now", "This is the cash left after the equity release is used to clear any remaining mortgage balance.")
 explain("Amount due to Equity Lender", "This is the total amount payable to the equity lender at sale. If interest is not paid monthly, unpaid interest is added.")
 explain("Remaining equity at sale", "This is the estimated amount left from the property after the equity lender has been repaid.")
 explain("Total client position", "This combines remaining equity, cash received now, possible investment growth, and avoided mortgage payments.")
+explain("Nominal vs present value", "Nominal future value shows projected future amounts. Present value discounts those future amounts back to today's money using the selected discount rate.")
 
 st.subheader("Decision Insight")
 st.info(insight_message(result, years, property_growth_rate, interest_mode))
@@ -489,11 +514,7 @@ st.info(insight_message(result, years, property_growth_rate, interest_mode))
 st.subheader("Three Main Options")
 
 option_comparison = pd.DataFrame({
-    "Option": [
-        "Take lifetime mortgage",
-        "No equity release",
-        "Sell property now"
-    ],
+    "Option": ["Take lifetime mortgage", "No equity release", "Sell property now"],
     "Projected client outcome": [
         result["total_client_position"],
         result["no_equity_release_position"],
@@ -501,21 +522,34 @@ option_comparison = pd.DataFrame({
     ]
 })
 
+option_comparison["Present value"] = option_comparison["Projected client outcome"].apply(
+    lambda x: present_value(x, discount_rate, years)
+)
+
+if valuation_view == "Nominal future value":
+    display_options = option_comparison[["Option", "Projected client outcome"]]
+elif valuation_view == "Present value discounted to today":
+    display_options = option_comparison[["Option", "Present value"]]
+else:
+    display_options = option_comparison
+
 st.dataframe(
-    option_comparison.style.format({"Projected client outcome": "£{:,.0f}"}),
+    display_options.style.format({
+        "Projected client outcome": "£{:,.0f}",
+        "Present value": "£{:,.0f}",
+    }),
     use_container_width=True
 )
 
 fig_options, ax_options = plt.subplots()
-ax_options.bar(option_comparison["Option"], option_comparison["Projected client outcome"])
+if valuation_view == "Present value discounted to today":
+    ax_options.bar(option_comparison["Option"], option_comparison["Present value"])
+    ax_options.set_ylabel("Present value (£)")
+else:
+    ax_options.bar(option_comparison["Option"], option_comparison["Projected client outcome"])
+    ax_options.set_ylabel("Projected client outcome (£)")
 ax_options.set_title("Projected Outcome: Three Main Options")
-ax_options.set_ylabel("Projected client outcome (£)")
 st.pyplot(fig_options)
-
-explain(
-    "Three main options",
-    "This compares taking lifetime mortgage, keeping the property without equity release, or selling the property now and optionally investing the proceeds."
-)
 
 # ==========================================================
 # DETAILED BREAKDOWN
@@ -578,8 +612,20 @@ breakdown = pd.DataFrame({
     ]
 })
 
+breakdown["Present value"] = breakdown["Value"].apply(lambda x: present_value(x, discount_rate, years))
+
+if valuation_view == "Nominal future value":
+    breakdown_display = breakdown[["Item", "Value"]]
+elif valuation_view == "Present value discounted to today":
+    breakdown_display = breakdown[["Item", "Present value"]]
+else:
+    breakdown_display = breakdown
+
 st.dataframe(
-    breakdown.style.format({"Value": "£{:,.0f}"}),
+    breakdown_display.style.format({
+        "Value": "£{:,.0f}",
+        "Present value": "£{:,.0f}",
+    }),
     use_container_width=True
 )
 
@@ -590,7 +636,6 @@ st.dataframe(
 st.subheader("Multiple Possible Futures")
 
 growth_rates = sorted(set([-1.0, 0.0, 2.0, 3.0, 5.0, property_growth_rate]))
-
 scenario_rows = []
 
 for growth in growth_rates:
@@ -625,6 +670,9 @@ for growth in growth_rates:
 
 scenario_df = pd.DataFrame(scenario_rows)
 
+for col in ["Future property value", "Amount due to Equity Lender", "Remaining equity", "Total client position", "No equity release", "Sell now"]:
+    scenario_df[f"{col} - PV"] = scenario_df[col].apply(lambda x: present_value(x, discount_rate, years))
+
 st.dataframe(
     scenario_df.style.format({
         "Future property value": "£{:,.0f}",
@@ -633,6 +681,12 @@ st.dataframe(
         "Total client position": "£{:,.0f}",
         "No equity release": "£{:,.0f}",
         "Sell now": "£{:,.0f}",
+        "Future property value - PV": "£{:,.0f}",
+        "Amount due to Equity Lender - PV": "£{:,.0f}",
+        "Remaining equity - PV": "£{:,.0f}",
+        "Total client position - PV": "£{:,.0f}",
+        "No equity release - PV": "£{:,.0f}",
+        "Sell now - PV": "£{:,.0f}",
     }),
     use_container_width=True
 )
@@ -668,17 +722,28 @@ for year in range(1, years + 1):
         "Lifetime mortgage": year_result["total_client_position"],
         "No equity release": year_result["no_equity_release_position"],
         "Sell property now": year_result["future_value_sell_now_cash"],
+        "Lifetime mortgage - PV": present_value(year_result["total_client_position"], discount_rate, year),
+        "No equity release - PV": present_value(year_result["no_equity_release_position"], discount_rate, year),
+        "Sell property now - PV": present_value(year_result["future_value_sell_now_cash"], discount_rate, year),
     })
 
 three_option_df = pd.DataFrame(three_option_rows)
 
 fig_three, ax_three = plt.subplots()
-ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage"], label="Lifetime mortgage")
-ax_three.plot(three_option_df["Year"], three_option_df["No equity release"], label="No equity release")
-ax_three.plot(three_option_df["Year"], three_option_df["Sell property now"], label="Sell property now")
+
+if valuation_view == "Present value discounted to today":
+    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage - PV"], label="Lifetime mortgage - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["No equity release - PV"], label="No equity release - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now - PV"], label="Sell property now - PV")
+    ax_three.set_ylabel("Present value (£)")
+else:
+    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage"], label="Lifetime mortgage")
+    ax_three.plot(three_option_df["Year"], three_option_df["No equity release"], label="No equity release")
+    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now"], label="Sell property now")
+    ax_three.set_ylabel("Projected client outcome (£)")
+
 ax_three.set_title("Comparison of All 3 Options Over Time")
 ax_three.set_xlabel("Years")
-ax_three.set_ylabel("Projected client outcome (£)")
 ax_three.legend()
 st.pyplot(fig_three)
 
@@ -687,17 +752,15 @@ st.dataframe(
         "Lifetime mortgage": "£{:,.0f}",
         "No equity release": "£{:,.0f}",
         "Sell property now": "£{:,.0f}",
+        "Lifetime mortgage - PV": "£{:,.0f}",
+        "No equity release - PV": "£{:,.0f}",
+        "Sell property now - PV": "£{:,.0f}",
     }),
     use_container_width=True
 )
 
-explain(
-    "Three-option comparison over time",
-    "This chart compares the projected outcome of taking lifetime mortgage, keeping the property without equity release, or selling the property now and optionally investing the proceeds."
-)
-
 # ==========================================================
-# SCENARIO SAVING
+# SAVE SCENARIO
 # ==========================================================
 
 st.subheader("Save Scenario")
@@ -720,7 +783,6 @@ if st.button("Save this scenario"):
 
 if st.session_state.saved_scenarios:
     saved_df = pd.DataFrame(st.session_state.saved_scenarios)
-
     st.dataframe(
         saved_df.style.format({
             "Lifetime mortgage": "£{:,.0f}",
@@ -747,6 +809,8 @@ report_inputs = {
     "Existing mortgage interest rate": f"{mortgage_interest_rate}%",
     "Property growth assumption": f"{property_growth_rate}%",
     "Investment return assumption": f"{investment_return_rate}%",
+    "Valuation view": valuation_view,
+    "Discount rate": f"{discount_rate}%",
     "Years until sale / care / death": years,
     "Interest treatment": interest_mode,
     "Release calculation basis": release_basis,
@@ -755,7 +819,7 @@ report_inputs = {
     "Invest sell-now cash": invest_sell_now_cash,
 }
 
-pdf_report = create_pdf_report(result, report_inputs)
+pdf_report = create_pdf_report(result, report_inputs, valuation_view, discount_rate, years)
 
 st.download_button(
     label="Download PDF report",
@@ -765,8 +829,14 @@ st.download_button(
 )
 
 # ==========================================================
-# FINAL SUMMARY
+# FOOTER
 # ==========================================================
+
+st.markdown("---")
+st.caption(
+    "Financial model concept and implementation. Built with AI assistance. "
+    "This tool is proprietary. Unauthorized use, reproduction, or distribution is prohibited."
+)
 
 st.subheader("Plain-English Summary")
 
@@ -784,12 +854,13 @@ st.write(
     3. **Sell property now**  
        The client receives the current property value after clearing the remaining mortgage, with an option to invest the proceeds.
 
-    The model also considers:
-    - property growth or decline,
-    - interest paid monthly versus interest rolled up,
-    - investment of released cash,
-    - investment of avoided mortgage payments,
-    - no negative equity protection,
-    - and the opportunity benefit of not having to continue paying the existing mortgage.
+    The model can show results in two ways:
+
+    - **Nominal future value:** projected future amounts.
+    - **Present value:** future amounts discounted back to today's money.
+
+    The model also considers property growth or decline, interest paid monthly versus interest rolled up,
+    investment of released cash, investment of avoided mortgage payments, no negative equity protection,
+    and the opportunity benefit of not having to continue paying the existing mortgage.
     """
 )
