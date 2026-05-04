@@ -116,7 +116,6 @@ def calculate_model(
     net_cash_now = equity_released - remaining_mortgage
 
     future_property_value = current_property_value * ((1 + property_growth_rate / 100) ** years)
-
     equity_lender_share_at_disposal = future_property_value * (equity_release_percent / 100)
 
     if interest_mode == "Interest paid monthly":
@@ -569,12 +568,38 @@ st.dataframe(
 )
 
 fig_options, ax_options = plt.subplots()
-if valuation_view == "Present value discounted to today":
-    ax_options.bar(option_comparison["Option"], option_comparison["Present value"])
-    ax_options.set_ylabel("Present value (£)")
-else:
+
+if valuation_view == "Nominal future value":
     ax_options.bar(option_comparison["Option"], option_comparison["Projected client outcome"])
     ax_options.set_ylabel("Projected client outcome (£)")
+
+elif valuation_view == "Present value discounted to today":
+    ax_options.bar(option_comparison["Option"], option_comparison["Present value"])
+    ax_options.set_ylabel("Present value (£)")
+
+else:
+    x = range(len(option_comparison["Option"]))
+    width = 0.35
+
+    ax_options.bar(
+        [i - width / 2 for i in x],
+        option_comparison["Projected client outcome"],
+        width,
+        label="Future value"
+    )
+
+    ax_options.bar(
+        [i + width / 2 for i in x],
+        option_comparison["Present value"],
+        width,
+        label="Present value"
+    )
+
+    ax_options.set_xticks(list(x))
+    ax_options.set_xticklabels(option_comparison["Option"])
+    ax_options.set_ylabel("Amount (£)")
+    ax_options.legend()
+
 ax_options.set_title("Projected Outcome: Three Main Options")
 st.pyplot(fig_options)
 
@@ -758,16 +783,27 @@ three_option_df = pd.DataFrame(three_option_rows)
 
 fig_three, ax_three = plt.subplots()
 
-if valuation_view == "Present value discounted to today":
-    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage - PV"], label="Lifetime mortgage - PV")
-    ax_three.plot(three_option_df["Year"], three_option_df["No equity release - PV"], label="No equity release - PV")
-    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now - PV"], label="Sell property now - PV")
-    ax_three.set_ylabel("Present value (£)")
-else:
+if valuation_view == "Nominal future value":
     ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage"], label="Lifetime mortgage")
     ax_three.plot(three_option_df["Year"], three_option_df["No equity release"], label="No equity release")
     ax_three.plot(three_option_df["Year"], three_option_df["Sell property now"], label="Sell property now")
     ax_three.set_ylabel("Projected client outcome (£)")
+
+elif valuation_view == "Present value discounted to today":
+    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage - PV"], label="Lifetime mortgage - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["No equity release - PV"], label="No equity release - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now - PV"], label="Sell property now - PV")
+    ax_three.set_ylabel("Present value (£)")
+
+else:
+    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage"], label="Lifetime mortgage - future")
+    ax_three.plot(three_option_df["Year"], three_option_df["No equity release"], label="No equity release - future")
+    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now"], label="Sell property now - future")
+
+    ax_three.plot(three_option_df["Year"], three_option_df["Lifetime mortgage - PV"], linestyle="--", label="Lifetime mortgage - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["No equity release - PV"], linestyle="--", label="No equity release - PV")
+    ax_three.plot(three_option_df["Year"], three_option_df["Sell property now - PV"], linestyle="--", label="Sell property now - PV")
+    ax_three.set_ylabel("Amount (£)")
 
 ax_three.set_title("Comparison of All 3 Options Over Time")
 ax_three.set_xlabel("Years")
@@ -880,14 +916,14 @@ st.write(
     - **Nominal future value:** projected future amounts.
     - **Present value:** future amounts discounted back to today's money.
 
-    The model also considers property growth or decline, interest paid monthly on the mortgage versus interest rolled up,
-    investment of the released cash, investment of avoided mortgage payments, no negative equity protection,
-    and the opportunity benefit of not having to continue paying the existing mortgage/interest.
+    The model also considers property growth or decline, interest paid monthly versus interest rolled up,
+    investment of released cash, investment of avoided mortgage payments, no negative equity protection,
+    and the opportunity benefit of not having to continue paying the existing mortgage.
     """
 )
 
 st.markdown("---")
 st.caption(
-    "© 2026 ES. Lifetime Mortgage Financial Decision Model. Built with AI assistance. "
+    " © 2026  ES  Lifetime mortgage decision model with AI assistance. "
     "This tool is proprietary. Unauthorized reproduction is prohibited."
 )
