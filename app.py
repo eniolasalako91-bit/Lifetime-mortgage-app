@@ -829,20 +829,14 @@ with st.expander("Download Report"):
 # FOOTER
 # ==========================================================
 
-st.markdown("---")
-st.caption(
-    "Financial model concept and implementation. Built with AI assistance. "
-    "This tool is proprietary. Unauthorized use, reproduction, or distribution is prohibited."
-)
-
-with st.expander("Plain-English Summary"):
+with st.expander("Summary"):
     st.write(
         """
         This model compares three possible choices:
 
         1. **Take lifetime mortgage**  
-        The client receives cash now, clears the remaining mortgage balance, may avoid future mortgage payments,
-        and keeps any remaining property value after the Equity Lender is repaid.
+        The client receives cash now, clears the remaining mortgage balance with no credit score required, may avoid future mortgage payments,
+        and keeps any remaining property value after the Equity Lender is repaid. 
 
         2. **No equity release**  
         The client keeps the property but continues to carry the existing mortgage until sale.
@@ -860,3 +854,9 @@ with st.expander("Plain-English Summary"):
         and the opportunity benefit of not having to continue paying the existing mortgage.
         """
     )
+
+st.markdown("---")
+st.caption(
+    "© 2026 ES Lifetime mortgage decision support modelled with AI assistance."
+    "This tool is proprietary. Unauthorized use, reproduction, or distribution is prohibited."
+)
