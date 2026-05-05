@@ -857,6 +857,6 @@ with st.expander("Summary"):
 
 st.markdown("---")
 st.caption(
-    "© 2026 ES Lifetime mortgage decision support modelled with AI assistance."
+    "© 2026 ES Lifetime mortgage decision support modelled with AI assistance. "
     "This tool is proprietary. Unauthorized use, reproduction, or distribution is prohibited."
 )
