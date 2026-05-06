@@ -346,15 +346,12 @@ else:
     )
 
 with st.expander("📱 Use this as a mobile app"):
-    st.write(
-        """
-        **iPhone:** open the link in Safari → tap Share → Add to Home Screen.
 
-        **Android:** open the link in Chrome → tap the three dots → Add to Home Screen or Install App.
+    st.markdown("""
+    **iPhone:** open the link in Safari → tap Share → Add to Home Screen.
 
-        This keeps the same web app but gives users an app-like phone experience.
-        """
-    )
+    **Android:** open the link in Chrome → tap the three dots → Add to Home Screen or Install App.
+    """)
 
 
 # ==========================================================
