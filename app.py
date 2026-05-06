@@ -5,7 +5,12 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-st.set_page_config(page_title="Lifetime Mortgage Decision Model", layout="centered")
+st.set_page_config(
+    page_title="Lifetime Mortgage App",
+    page_icon="assets/lifetime_mortgage_app_icon_512.png",
+    layout="wide"
+)
+
 
 
 # ==========================================================
